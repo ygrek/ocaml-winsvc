@@ -12,7 +12,6 @@
 */
 
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
-#define _CRT_SECURE_NO_DEPRECATE
 #include <stdio.h>
 #include <tchar.h>
 #include <windows.h>
@@ -87,11 +86,11 @@ int _tmain(int argc, _TCHAR* argv[])
 
 int install_service(int argc, TCHAR **argv)
 {
-    argc; argv;
 	TCHAR exe_filename[MAX_PATH];
 	SC_HANDLE handle_manager;
 	SC_HANDLE handle_service;
 	BOOL result;
+  SERVICE_DESCRIPTION description;
 
 	result = GetModuleFileName(0, exe_filename, MAX_PATH);
 	if (result == FALSE)
@@ -116,7 +115,6 @@ int install_service(int argc, TCHAR **argv)
 		return 3;
 	}
 
-  SERVICE_DESCRIPTION description;
 	description.lpDescription = SVNSERVICE_DESCRIPTION;
 	result = ChangeServiceConfig2(handle_service, SERVICE_CONFIG_DESCRIPTION, &description);
 
@@ -182,7 +180,6 @@ int debug_service(int argc, TCHAR **argv)
 
 int run_service(int argc, TCHAR **argv)
 {
-    argc; argv;
 	SERVICE_TABLE_ENTRY dispatch_table[] =
 	{
 		{ SVNSERVICE_NAME, (LPSERVICE_MAIN_FUNCTION) service_main },
@@ -211,7 +208,8 @@ BOOL WINAPI console_ctrl_handler(DWORD ctrl_type)
 
 void service_main(DWORD argc, TCHAR **argv)
 {
-    argc; argv;
+    char* z = NULL;
+
     memset(&service_status, 0, sizeof(SERVICE_STATUS));
     service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
     service_status.dwServiceSpecificExitCode = 0;
@@ -220,7 +218,6 @@ void service_main(DWORD argc, TCHAR **argv)
 
     report_status(SERVICE_START_PENDING, NO_ERROR, 2000);
 
-    char* z = NULL;
     caml_startup(&z);
 
     report_status(SERVICE_RUNNING, NO_ERROR, 0);
