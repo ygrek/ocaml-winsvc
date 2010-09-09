@@ -3,8 +3,8 @@ let f = open_out "\\service.log"
 let pr = Printf.fprintf f "%s\n%!"
 
 let should_stop = ref false
-let stop () = should_stop := true
 let run () = 
+  Gc.compact ();
   let rec wait x =
     if !should_stop then () else
     begin
@@ -17,5 +17,9 @@ let run () =
   pr "finished";
   close_out f
 
-let () = Callback.register "service.run" run
-let () = Callback.register "service.stop" stop
+let () =
+  match List.tl (Array.to_list Sys.argv) with
+  | ["-install"] -> Service.install ()
+  | ["-remove"] -> Service.remove ()
+  | [] -> Service.run run should_stop
+  | _ -> print_endline "doing nothing"

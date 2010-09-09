@@ -1,4 +1,9 @@
 *.cmx
 *.cmi
-*.o*
+*.o
 *.exe
+*.obj
+*.dll
+*.lib
+*.a
+*.cmxa
