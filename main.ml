@@ -2,24 +2,28 @@
 let f = open_out "\\service.log"
 let pr = Printf.fprintf f "%s\n%!"
 
-let should_stop = ref false
-let run () = 
+module S = struct
+let name = "test"
+let display = "Test service"
+let text = "Test service written in OCaml"
+let stop = ref false
+end
+
+module Svc = Service.Make(S)
+
+let main () = 
+  pr "main";
   Gc.compact ();
-  let rec wait x =
-    if !should_stop then () else
-    begin
-      Unix.sleep 1;
-      wait (x+1)
-    end 
-  in
   pr "running";
-  wait 0;
-  pr "finished";
-  close_out f
+  while not !S.stop do Unix.sleep 1 done;
+  pr "finished"
 
 let () =
   match List.tl (Array.to_list Sys.argv) with
-  | ["-install"] -> Service.install ()
-  | ["-remove"] -> Service.remove ()
-  | [] -> Service.run run should_stop
+  | ["-install"] -> Svc.install ()
+  | ["-remove"] -> Svc.remove ()
+  | [] -> pr "run"; (try Svc.run main with exn -> pr (Printexc.to_string exn))
   | _ -> print_endline "doing nothing"
+
+let () =
+  close_out f

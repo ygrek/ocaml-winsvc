@@ -22,11 +22,10 @@
 #include <caml/alloc.h>
 #include <caml/fail.h>
 
-#include "service.h"
-
 static value cb_service_run = Val_unit;
 static value cb_service_stop = Val_unit;
 static value* exn_service = NULL;
+static char* s_service_name = NULL;
 
 void call_service_run(void)
 {
@@ -48,9 +47,9 @@ static void raise_error(char* str)
   caml_raise_with_string(*exn_service, str);
 }
 
-CAMLprim value caml_service_install(value u)
+CAMLprim value caml_service_install(value v_name, value v_display, value v_text)
 {
-  CAMLparam1(u);
+  CAMLparam3(v_name,v_display,v_text);
 
 	TCHAR exe_filename[MAX_PATH];
 	SC_HANDLE handle_manager;
@@ -71,7 +70,7 @@ CAMLprim value caml_service_install(value u)
 	}
 
 	handle_service = CreateService(
-		handle_manager, SVNSERVICE_NAME, SVNSERVICE_DISPLAY_NAME, SERVICE_ALL_ACCESS,
+		handle_manager, String_val(v_name), String_val(v_display), SERVICE_ALL_ACCESS,
 		SERVICE_WIN32_OWN_PROCESS, SERVICE_AUTO_START,
 		SERVICE_ERROR_NORMAL, exe_filename, 0, 0, 0, 0, 0);
 	if (handle_service == 0)
@@ -80,7 +79,7 @@ CAMLprim value caml_service_install(value u)
 		raise_error("Failed to create service in service control manager");
 	}
 
-	description.lpDescription = SVNSERVICE_DESCRIPTION;
+	description.lpDescription = String_val(v_text);
 	result = ChangeServiceConfig2(handle_service, SERVICE_CONFIG_DESCRIPTION, &description);
 
 	CloseServiceHandle(handle_service);
@@ -89,9 +88,9 @@ CAMLprim value caml_service_install(value u)
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_service_remove(value u)
+CAMLprim value caml_service_remove(value v_name)
 {
-  CAMLparam1(u);
+  CAMLparam1(v_name);
 
 	SC_HANDLE handle_manager;
 	SC_HANDLE handle_service;
@@ -104,7 +103,7 @@ CAMLprim value caml_service_remove(value u)
 		raise_error("Failed to open service control manager");
 	}
 
-	handle_service = OpenService(handle_manager, SVNSERVICE_NAME, SERVICE_ALL_ACCESS);
+	handle_service = OpenService(handle_manager, String_val(v_name), SERVICE_ALL_ACCESS);
 	if (handle_service == 0)
 	{
 		CloseServiceHandle(handle_manager);
@@ -167,26 +166,37 @@ static SERVICE_STATUS service_status;
 static SERVICE_STATUS_HANDLE handle_service_status = 0;
 static int check_point = 1;
 
-CAMLprim value caml_service_run(value run, value stop)
+CAMLprim value caml_service_run(value v_name, value v_run, value v_stop)
 {
-  CAMLparam2(run, stop);
+  CAMLparam3(v_name, v_run, v_stop);
   BOOL result;
+  // not sure whether it is needed but better stay on the safe side
+  char* s_name = strdup(String_val(v_name));
 	SERVICE_TABLE_ENTRY dispatch_table[] =
 	{
-		{ SVNSERVICE_NAME, (LPSERVICE_MAIN_FUNCTION) service_main },
+		{ s_name, (LPSERVICE_MAIN_FUNCTION) service_main },
 		{ 0, 0 }
-	};  
+	};
 
   if (Val_unit != cb_service_run)
+  {
+    free(s_name);
     raise_error("Already running");
+  }
 
-  caml_modify_generational_global_root(&cb_service_run, run);
-  caml_modify_generational_global_root(&cb_service_stop, stop);
+  s_service_name = s_name;
+
+  caml_modify_generational_global_root(&cb_service_run, v_run);
+  caml_modify_generational_global_root(&cb_service_stop, v_stop);
 
 	result = StartServiceCtrlDispatcher(dispatch_table);
 
   caml_modify_generational_global_root(&cb_service_run, Val_unit);
   caml_modify_generational_global_root(&cb_service_stop, Val_unit);
+
+  s_service_name = NULL;
+
+  free(s_name);
   
   if (FALSE == result)
     raise_error("Failed to run service");
@@ -201,7 +211,7 @@ void service_main(DWORD argc, TCHAR **argv)
     memset(&service_status, 0, sizeof(SERVICE_STATUS));
     service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
     service_status.dwServiceSpecificExitCode = 0;
-    handle_service_status = RegisterServiceCtrlHandler(SVNSERVICE_NAME, service_ctrl_handler);
+    handle_service_status = RegisterServiceCtrlHandler(s_service_name, service_ctrl_handler);
 
     report_status(SERVICE_START_PENDING, NO_ERROR, 2000);
 
