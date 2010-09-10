@@ -1,1 +1,1 @@
-del *.o *.obj *.lib *.cmxa *.cmx *.cmi *.dll *.a *.cmo *.cma
+del *.o *.obj *.lib *.cmxa *.cmx *.cmi *.dll *.a *.cmo *.cma *.exe

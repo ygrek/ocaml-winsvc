@@ -1,6 +1,8 @@
 
-let f = open_out "\\service.log"
-let pr = Printf.fprintf f "%s\n%!"
+open Printf
+
+let f = lazy (open_out_gen [Open_text;Open_creat;Open_append;Open_wronly] 0o640 "\\service.log")
+let pr = fprintf (Lazy.force f) "%s\n%!"
 
 module S = struct
 let name = "test"
@@ -11,7 +13,7 @@ end
 
 module Svc = Service.Make(S)
 
-let main () = 
+let main () =
   pr "main";
   Gc.compact ();
   pr "running";
@@ -20,10 +22,9 @@ let main () =
 
 let () =
   match List.tl (Array.to_list Sys.argv) with
-  | ["-install"] -> Svc.install ()
-  | ["-remove"] -> Svc.remove ()
-  | [] -> pr "run"; (try Svc.run main with exn -> pr (Printexc.to_string exn))
+  | ["-install"] -> Svc.install (); printf "Installed %S" S.name
+  | ["-remove"] -> Svc.remove (); printf "Removed %S" S.name
+  | [] -> 
+      (* launched as service by SCM *)
+      begin try Svc.run main with exn -> pr (Printexc.to_string exn) end
   | _ -> print_endline "doing nothing"
-
-let () =
-  close_out f

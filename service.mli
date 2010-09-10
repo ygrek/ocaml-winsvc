@@ -1,7 +1,11 @@
-(** Windows service *)
+(** Windows service 
+
+    Only one service in process is supported
+*)
 
 exception Error of string
 
+(** Signature describing service hosted in this process *)
 module type Sig =
 sig
   (** Service identifier (unique) *)
@@ -16,7 +20,9 @@ end
 
 module Make(S : Sig) :
 sig
+  (** Install current executable as Windows service *)
   val install : unit -> unit
+  (** Remove service *)
   val remove : unit -> unit
   (** [run main]
     @param main function to run, stdin/stdout not available (will raise exception if used),
