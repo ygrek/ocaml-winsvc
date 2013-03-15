@@ -21,6 +21,7 @@
 #include <caml/callback.h>
 #include <caml/alloc.h>
 #include <caml/fail.h>
+#include <caml/threads.h>
 
 static value cb_service_run = Val_unit;
 static value cb_service_stop = Val_unit;
@@ -29,17 +30,23 @@ static char* s_service_name = NULL;
 
 void call_service_run(void)
 {
-  CAMLparam0();
   assert(Val_unit != cb_service_run);
+  caml_c_thread_register();
+  caml_acquire_runtime_system();
   caml_callback_exn(cb_service_run, Val_unit);
-  CAMLreturn0;
+  caml_release_runtime_system();
+  caml_c_thread_unregister();
 }
 
-// This function and callback are not allowed to touch ocaml runtime in any way
 void call_service_stop(void)
 {
   assert(Val_unit != cb_service_stop);
+  
+  caml_c_thread_register();
+  caml_acquire_runtime_system();
   caml_callback_exn(cb_service_stop, Val_unit);
+  caml_release_runtime_system();
+  caml_c_thread_unregister();
 }
 
 static void raise_error(char* str) 
@@ -47,21 +54,13 @@ static void raise_error(char* str)
   caml_raise_with_string(*exn_service, str);
 }
 
-CAMLprim value caml_service_install(value v_name, value v_display, value v_text)
+CAMLprim value caml_service_install(value v_name, value v_display, value v_text, value v_path)
 {
-  CAMLparam3(v_name,v_display,v_text);
+  CAMLparam4(v_name,v_display,v_text,v_path);
 
-	TCHAR exe_filename[MAX_PATH];
 	SC_HANDLE handle_manager;
 	SC_HANDLE handle_service;
-	BOOL result;
   SERVICE_DESCRIPTION description;
-
-	result = GetModuleFileName(0, exe_filename, MAX_PATH);
-	if (result == FALSE)
-	{
-		raise_error("Failed to retrieve executable path");		
-	}
 
 	handle_manager = OpenSCManager(0, 0, SC_MANAGER_ALL_ACCESS);
 	if (handle_manager == 0)
@@ -72,7 +71,7 @@ CAMLprim value caml_service_install(value v_name, value v_display, value v_text)
 	handle_service = CreateService(
 		handle_manager, String_val(v_name), String_val(v_display), SERVICE_ALL_ACCESS,
 		SERVICE_WIN32_OWN_PROCESS, SERVICE_AUTO_START,
-		SERVICE_ERROR_NORMAL, exe_filename, 0, 0, 0, 0, 0);
+		SERVICE_ERROR_NORMAL, String_val(v_path), 0, 0, 0, 0, 0);
 	if (handle_service == 0)
 	{
 		CloseServiceHandle(handle_manager);
@@ -80,7 +79,7 @@ CAMLprim value caml_service_install(value v_name, value v_display, value v_text)
 	}
 
 	description.lpDescription = String_val(v_text);
-	result = ChangeServiceConfig2(handle_service, SERVICE_CONFIG_DESCRIPTION, &description);
+	ChangeServiceConfig2(handle_service, SERVICE_CONFIG_DESCRIPTION, &description);
 
 	CloseServiceHandle(handle_service);
 	CloseServiceHandle(handle_manager);
@@ -189,7 +188,9 @@ CAMLprim value caml_service_run(value v_name, value v_run, value v_stop)
   caml_modify_generational_global_root(&cb_service_run, v_run);
   caml_modify_generational_global_root(&cb_service_stop, v_stop);
 
+  caml_release_runtime_system();
 	result = StartServiceCtrlDispatcher(dispatch_table);
+  caml_acquire_runtime_system();
 
   caml_modify_generational_global_root(&cb_service_run, Val_unit);
   caml_modify_generational_global_root(&cb_service_stop, Val_unit);
