@@ -1,5 +1,5 @@
 
-external install : string -> string -> string -> unit = "caml_service_install"
+external install : string -> string -> string -> string -> unit = "caml_service_install"
 external remove : string -> unit = "caml_service_remove"
 external run : string -> (unit -> unit) -> (unit -> unit) -> unit = "caml_service_run"
 external init : unit -> unit = "caml_service_init"
@@ -15,12 +15,18 @@ sig
   val name : string
   val display : string
   val text : string
-  val stop : bool ref
+  val arguments : string list
+  val stop : unit -> unit
 end
 
 module Make(S : Sig) =
 struct
-  let install () = install S.name S.display S.text
+  let args = 
+    List.map Filename.quote S.arguments
+  let path =
+    String.concat " " (Sys.executable_name :: args)
+  let install () =
+    install S.name S.display S.text path
   let remove () = remove S.name
-  let run main = run S.name main (fun () -> S.stop := true)
+  let run main = run S.name main S.stop
 end
