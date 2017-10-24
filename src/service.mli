@@ -22,13 +22,12 @@ end
 
 module Make(S : Sig) :
 sig
-  (** Install current executable as Windows service, started 
-    * with the given arguments *)
+  (** Install current executable as Windows service, started with the given arguments *)
   val install : unit -> unit
   (** Remove service *)
   val remove : unit -> unit
   (** [run main]
     @param main function to run, stdin/stdout not available (will raise exception if used),
-                when [!S.stop] is true this function should return as soon as possible *)
+                when [S.stop] is called this function should return as soon as possible *)
   val run : (unit -> unit) -> unit
 end
