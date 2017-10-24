@@ -1,6 +1,0 @@
-name = "winsvc"
-version = "0.0.1"
-description = "Windows Service"
-requires = ""
-archive(byte) = "service.cma"
-archive(native) = "service.cmxa"

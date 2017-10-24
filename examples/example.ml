@@ -3,12 +3,14 @@ open Printf
 
 let f = lazy (open_out_gen [Open_text;Open_creat;Open_append;Open_wronly] 0o640 "\\service.log")
 let pr = fprintf (Lazy.force f) "%s\n%!"
+let should_stop = ref false
 
 module S = struct
 let name = "test"
 let display = "Test service"
 let text = "Test service written in OCaml"
-let stop = ref false
+let arguments = []
+let stop () = should_stop := true
 end
 
 module Svc = Service.Make(S)
@@ -17,7 +19,7 @@ let main () =
   pr "main";
   Gc.compact ();
   pr "running";
-  while not !S.stop do Unix.sleep 1 done;
+  while not !should_stop do Unix.sleep 1 done;
   pr "finished"
 
 let () =
